@@ -202,7 +202,7 @@ export const AddQuestionsPage: React.FC = () => {
 
       const bulkResult = await questionsApi.bulkCreate(bulkPayload);
 
-      if (!bulkResult.success) {
+      if (bulkResult.status !== 'success') {
         toast.error(bulkResult.message || 'Failed to save questions.');
         return;
       }

@@ -6,13 +6,14 @@ export interface LoginRequest {
   password: string;
 }
 
+// Real API shape: { status: "success", message: "...", data: { token, user } }
 export interface LoginResponse {
-  success: boolean;
+  status: string;
+  message?: string;
   data: {
     token: string;
     user: User;
   };
-  message?: string;
 }
 
 export const authApi = {

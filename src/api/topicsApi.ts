@@ -2,12 +2,12 @@ import { axiosInstance } from './axiosInstance';
 import type { Topic, SubTopic } from '../types';
 
 export interface TopicsResponse {
-  success: boolean;
+  status: string;
   data: Topic[];
 }
 
 export interface SubTopicsResponse {
-  success: boolean;
+  status: string;
   data: SubTopic[];
 }
 

@@ -42,9 +42,10 @@ export const LoginPage: React.FC = () => {
     setIsLoading(true);
     try {
       const response = await authApi.login(data);
-      if (response.success && response.data) {
+      // Real API shape: { status: "success", data: { token, user } }
+      if (response.status === 'success' && response.data?.token && response.data?.user) {
         login(response.data.token, response.data.user);
-        toast.success(response.message || 'Login successful!');
+        toast.success('Login successful!');
         navigate('/dashboard');
       } else {
         toast.error(response.message || 'Login failed. Please check your credentials.');

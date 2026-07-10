@@ -1,45 +1,36 @@
 import { axiosInstance } from './axiosInstance';
 import type { Test } from '../types';
 
-export interface TestsListResponse {
-  success: boolean;
-  data: Test[];
-}
-
-export interface SingleTestResponse {
-  success: boolean;
-  data: Test;
-}
-
-export interface CreateUpdateTestResponse {
-  success: boolean;
-  data: Test;
+// Real API shape: { status: "success"/"error", message?: string, data: Test | Test[] }
+export interface ApiResponse<T> {
+  status: string;
   message?: string;
+  data: T;
 }
 
 export const testsApi = {
   getTests: async (): Promise<Test[]> => {
-    const response = await axiosInstance.get<TestsListResponse>('/tests');
+    const response = await axiosInstance.get<ApiResponse<Test[]>>('/tests');
     return response.data.data;
   },
 
   getTestById: async (id: string): Promise<Test> => {
-    const response = await axiosInstance.get<SingleTestResponse>(`/tests/${id}`);
+    const response = await axiosInstance.get<ApiResponse<Test>>(`/tests/${id}`);
     return response.data.data;
   },
 
-  createTest: async (payload: Partial<Test>): Promise<CreateUpdateTestResponse> => {
-    const response = await axiosInstance.post<CreateUpdateTestResponse>('/tests', payload);
+  createTest: async (payload: Partial<Test>): Promise<ApiResponse<Test>> => {
+    const response = await axiosInstance.post<ApiResponse<Test>>('/tests', payload);
     return response.data;
   },
 
-  updateTest: async (id: string, payload: Partial<Test>): Promise<CreateUpdateTestResponse> => {
-    const response = await axiosInstance.put<CreateUpdateTestResponse>(`/tests/${id}`, payload);
+  updateTest: async (id: string, payload: Partial<Test>): Promise<ApiResponse<Test>> => {
+    const response = await axiosInstance.put<ApiResponse<Test>>(`/tests/${id}`, payload);
     return response.data;
   },
 
-  publishTest: async (id: string): Promise<CreateUpdateTestResponse> => {
-    const response = await axiosInstance.put<CreateUpdateTestResponse>(`/tests/${id}`, { status: 'live' });
+  publishTest: async (id: string): Promise<ApiResponse<Test>> => {
+    const response = await axiosInstance.put<ApiResponse<Test>>(`/tests/${id}`, { status: 'live' });
     return response.data;
   },
 };

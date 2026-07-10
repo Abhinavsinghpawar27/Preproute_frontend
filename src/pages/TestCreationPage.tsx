@@ -33,15 +33,17 @@ export const TestCreationPage: React.FC = () => {
   const handleSubmit = async (formValues: any, requestedStatus: 'draft' | 'live' | null) => {
     setIsSubmitting(true);
     
-    // Build API payload
+    // API requires status as a string ("draft", "live") — null is rejected
+    const status = requestedStatus === 'draft' ? 'draft' : undefined;
     const payload = {
       ...formValues,
-      status: requestedStatus || null, // Will be 'draft' if draft, or null (stays null until publish)
+      ...(status ? { status } : {}),
     };
+
+    console.log('[TestCreation] Submitting with payload:', JSON.stringify(payload, null, 2));
 
     try {
       if (id) {
-        // Edit mode
         await testsApi.updateTest(id, payload);
         toast.success('Test metadata updated successfully!');
         if (requestedStatus === 'draft') {
@@ -50,9 +52,8 @@ export const TestCreationPage: React.FC = () => {
           navigate(`/test/${id}/questions`);
         }
       } else {
-        // Create mode
         const response = await testsApi.createTest(payload);
-        if (response.success && response.data) {
+        if (response.status === 'success' && response.data) {
           const testId = response.data.id;
           toast.success(response.message || 'Test created successfully!');
           if (requestedStatus === 'draft') {
@@ -65,8 +66,14 @@ export const TestCreationPage: React.FC = () => {
         }
       }
     } catch (error: any) {
-      console.error('Submit test error:', error);
-      toast.error(error?.response?.data?.message || 'Failed to save test details.');
+      console.error('[TestCreation] Submit error:', error);
+      console.error('[TestCreation] Error response data:', error?.response?.data);
+      console.error('[TestCreation] Error response status:', error?.response?.status);
+      const apiMessage = error?.response?.data?.message || 'Failed to save test details.';
+      const validationDetails = error?.response?.data?.errors
+        ? ' ' + JSON.stringify(error.response.data.errors)
+        : '';
+      toast.error(apiMessage + validationDetails);
     } finally {
       setIsSubmitting(false);
     }
