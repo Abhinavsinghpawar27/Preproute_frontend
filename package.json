@@ -1,11 +1,12 @@
 {
-  "name": "temp_vite",
+  "name": "preproute-test-management",
   "private": true,
   "version": "0.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "typecheck": "tsc --noEmit",
     "lint": "oxlint",
     "preview": "vite preview"
   },

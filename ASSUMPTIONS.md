@@ -14,3 +14,12 @@ This file documents assumptions and design choices made during development to re
 2. **Cascading Dropdowns**: Selected subject triggers topic fetch and resets selected topics/subtopics. Selected topics trigger subtopic fetch and filter out subtopics that no longer match the active topics.
 3. **Alternative Tabs**: Selecting PYQ or Mock Test tabs switches the `type` value submitted to the backend, but reuses the same input layout and cascading options, as specified by the build plan.
 
+## Phase 6 — Add Questions Page
+1. **CSV Import Format**: CSV columns assumed as: `question,option1,option2,option3,option4,correct_option,explanation,difficulty`. If the first row contains the word "question" it is treated as a header and skipped.
+2. **Local IDs**: Questions are tracked locally with `uuid`-generated IDs until saved to the backend via `POST /questions/bulk`.
+
+## Phase 7 — Preview & Publish Page
+1. **Schedule Fields**: The API contract has no dedicated fields for scheduling. The fields `publish_at` and `live_until` are sent on the same `PUT /tests/:id` call as additional properties. Field names will need backend confirmation before going live.
+2. **Live Until Presets**: Options "1 Week", "2 Weeks", "3 Weeks", "1 Month" send string values (`1week`, `2weeks`, `3weeks`, `1month`) to the backend. The exact backend contract for these values is unspecified.
+
+
