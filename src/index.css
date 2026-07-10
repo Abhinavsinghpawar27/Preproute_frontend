@@ -1,0 +1,17 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", system-ui, sans-serif;
+  --color-brand-primary: #5B7FEC;
+  --color-brand-primary-hover: #4A6FD8;
+  --color-brand-light-blue: #F0F4FE;
+  --color-brand-dark-text: #1F2937;
+  --color-brand-gray: #6B7280;
+  --color-brand-border: #E5E7EB;
+}
+
+@layer base {
+  body {
+    @apply font-sans bg-slate-50 text-gray-900 antialiased min-h-screen;
+  }
+}
