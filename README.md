@@ -81,6 +81,9 @@ The optimised output will be in the `dist/` directory.
 
 <img width="1918" height="931" alt="Screenshot 2026-07-11 063531" src="https://github.com/user-attachments/assets/ca4476df-0efd-4c3f-afd3-8ac9ac91da0b" />
 
+<img width="1901" height="935" alt="image" src="https://github.com/user-attachments/assets/e2f8b818-3ac6-405a-8f24-5329642ddd45" />
+
+
 
 
 ## Folder Structure
