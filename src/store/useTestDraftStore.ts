@@ -13,6 +13,7 @@ export interface DraftQuestion {
   correct_option: 'option1' | 'option2' | 'option3' | 'option4' | '';
   explanation: string;
   difficulty: string;
+  media_url: string;
   test_id: string;
   isSaved?: boolean; // true once saved to backend
   savedId?: string;  // id returned from backend after save

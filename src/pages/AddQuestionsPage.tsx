@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, Plus, Upload, Trash2, CheckCircle, Circle, Eye } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Upload, Trash2, CheckCircle, Circle, Eye, Image } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { v4 as uuidv4 } from 'uuid';
 import { testsApi } from '../api/testsApi';
@@ -19,6 +19,7 @@ const EMPTY_QUESTION = (testId: string): DraftQuestion => ({
   correct_option: '',
   explanation: '',
   difficulty: '',
+  media_url: '',
   test_id: testId,
   isSaved: false,
 });
@@ -52,6 +53,21 @@ export const AddQuestionsPage: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const csvInputRef = useRef<HTMLInputElement>(null);
+  const questionEditorRef = useRef<HTMLDivElement>(null);
+  const prevActiveIdRef = useRef<string | null>(null);
+
+  // Uncontrolled rich text editor state (prevents caret/cursor resets while typing)
+  const questionHtmlRef = useRef<string>('');
+
+  const sanitizeQuestionHtmlForLtr = useCallback((html: string) => {
+    return (html ?? '')
+      .replace(/\s*dir\s*=\s*["'](?:rtl|ltr|auto)["']\s*/gi, '')
+      .replace(/\s*direction\s*:\s*[^;]+;?\s*/gi, '')
+      .replace(/\s*unicode-bidi\s*:\s*[^;]+;?\s*/gi, '');
+  }, []);
+
+  // Media preview error state (so we can show "Invalid image URL" when the URL fails to load)
+  const [mediaPreviewError, setMediaPreviewError] = useState<boolean>(false);
 
   const {
     draftQuestions,
@@ -92,6 +108,11 @@ export const AddQuestionsPage: React.FC = () => {
 
   const activeQuestion = draftQuestions.find((q) => q.localId === activeQuestionLocalId);
 
+  // Reset preview error when switching question or changing media_url
+  useEffect(() => {
+    setMediaPreviewError(false);
+  }, [activeQuestionLocalId, activeQuestion?.media_url]);
+
   const handleFieldChange = useCallback(
     (field: keyof DraftQuestion, value: string) => {
       if (!activeQuestionLocalId) return;
@@ -99,6 +120,40 @@ export const AddQuestionsPage: React.FC = () => {
     },
     [activeQuestionLocalId, updateQuestion]
   );
+
+  // Note: do not attempt caret preservation with getSelection()/Range here.
+  // Best-effort selection restoration can itself cause caret to jump/reverse typing in some browsers.
+
+  const commitQuestionHtmlToStore = useCallback(() => {
+    if (!questionEditorRef.current) return;
+    if (!activeQuestionLocalId) return;
+
+    const nextHtmlRaw = questionEditorRef.current.innerHTML;
+    const nextHtml = sanitizeQuestionHtmlForLtr(nextHtmlRaw);
+    questionHtmlRef.current = nextHtml;
+    updateQuestion(activeQuestionLocalId, { question: nextHtml });
+  }, [activeQuestionLocalId, updateQuestion]);
+
+  const execCmd = useCallback(
+    (cmd: string, val?: string) => {
+      if (questionEditorRef.current) {
+        questionEditorRef.current.focus();
+        document.execCommand(cmd, false, val);
+        commitQuestionHtmlToStore();
+      }
+    },
+    [commitQuestionHtmlToStore]
+  );
+
+  // Sync contentEditable innerHTML when switching to a different question
+  useEffect(() => {
+    if (prevActiveIdRef.current !== activeQuestionLocalId && questionEditorRef.current && activeQuestion) {
+      const nextHtml = sanitizeQuestionHtmlForLtr(activeQuestion.question ?? '');
+      questionEditorRef.current.innerHTML = nextHtml;
+      questionHtmlRef.current = nextHtml;
+      prevActiveIdRef.current = activeQuestionLocalId;
+    }
+  }, [activeQuestionLocalId, activeQuestion]);
 
   const handleAddNewQuestion = () => {
     if (!testId) return;
@@ -141,7 +196,7 @@ export const AddQuestionsPage: React.FC = () => {
     reader.onload = (event) => {
       const text = event.target?.result as string;
       const lines = text.split('\n').filter((l) => l.trim());
-      // ASSUMPTION: CSV format: question,option1,option2,option3,option4,correct_option,explanation,difficulty
+      // ASSUMPTION: CSV format: question,option1,option2,option3,option4,correct_option,explanation,difficulty,media_url
       const header = lines[0]?.toLowerCase() ?? '';
       const startIdx = header.includes('question') ? 1 : 0;
       let importCount = 0;
@@ -149,7 +204,7 @@ export const AddQuestionsPage: React.FC = () => {
       for (let i = startIdx; i < lines.length; i++) {
         const parts = lines[i]!.split(',').map((p) => p.trim().replace(/^"|"$/g, ''));
         if (parts.length < 6) continue;
-        const [question, option1, option2, option3, option4, correct_option, explanation, difficulty] = parts;
+        const [question, option1, option2, option3, option4, correct_option, explanation, difficulty, media_url] = parts;
         if (!question || !option1 || !option2 || !option3 || !option4) continue;
 
         const validCorrect = ['option1', 'option2', 'option3', 'option4'].includes(correct_option ?? '')
@@ -167,6 +222,7 @@ export const AddQuestionsPage: React.FC = () => {
           correct_option: validCorrect,
           explanation: explanation ?? '',
           difficulty: difficulty ?? '',
+          media_url: media_url ?? '',
           test_id: testId,
           isSaved: false,
         });
@@ -211,6 +267,7 @@ export const AddQuestionsPage: React.FC = () => {
           correct_option: q.correct_option,
           explanation: q.explanation,
           difficulty: q.difficulty,
+          media_url: q.media_url || undefined,
           subject: subjectId,
           test_id: q.test_id,
         })),
@@ -470,34 +527,97 @@ export const AddQuestionsPage: React.FC = () => {
                 </button>
               </div>
 
-              {/* Question Text Area */}
-              <div className="bg-white rounded-xl border border-gray-150 shadow-sm overflow-hidden">
+              {/* Question Text Area with Rich Text Toolbar */}
+              <div
+                className="bg-white rounded-xl border border-gray-150 shadow-sm overflow-hidden"
+                dir="ltr"
+                style={{ direction: 'ltr' }}
+              >
                 <div className="flex items-center gap-1.5 px-4 py-2.5 bg-gray-50 border-b border-gray-150 flex-wrap">
-                  {(['B', 'I', 'U', 'S'] as const).map((fmt) => (
-                    <button key={fmt} type="button" className={`px-2 py-0.5 text-xs font-bold rounded border border-gray-200 bg-white text-gray-600 hover:bg-gray-100 ${fmt === 'B' ? 'font-black' : fmt === 'I' ? 'italic' : fmt === 'U' ? 'underline' : 'line-through'}`}>{fmt}</button>
-                  ))}
+                  <button type="button" onClick={() => execCmd('bold')} className="px-2 py-0.5 text-xs font-black rounded border border-gray-200 bg-white text-gray-600 hover:bg-gray-100">B</button>
+                  <button type="button" onClick={() => execCmd('italic')} className="px-2 py-0.5 text-xs font-bold italic rounded border border-gray-200 bg-white text-gray-600 hover:bg-gray-100">I</button>
+                  <button type="button" onClick={() => execCmd('underline')} className="px-2 py-0.5 text-xs font-bold underline rounded border border-gray-200 bg-white text-gray-600 hover:bg-gray-100">U</button>
+                  <button type="button" onClick={() => execCmd('strikeThrough')} className="px-2 py-0.5 text-xs font-bold line-through rounded border border-gray-200 bg-white text-gray-600 hover:bg-gray-100">S</button>
                   <div className="w-px h-4 bg-gray-200 mx-1"></div>
-                  <button type="button" className="px-2 py-0.5 text-xs font-bold rounded border border-gray-200 bg-white text-gray-600 hover:bg-gray-100">¶</button>
-                  <button type="button" className="px-2 py-0.5 text-xs font-bold rounded border border-gray-200 bg-white text-gray-600 hover:bg-gray-100">≡</button>
-                  <button type="button" className="px-2 py-0.5 text-xs font-bold rounded border border-gray-200 bg-white text-gray-600 hover:bg-gray-100">⊞</button>
-                  <button type="button" className="px-2 py-0.5 text-xs font-bold rounded border border-gray-200 bg-white text-gray-600 hover:bg-gray-100">fx</button>
-                </div>
-                <div className="relative">
-                  <textarea
-                    value={activeQuestion.question}
-                    onChange={(e) => handleFieldChange('question', e.target.value)}
-                    placeholder="Type the question here..."
-                    rows={4}
-                    className="w-full px-4 py-3 text-sm text-gray-800 placeholder-gray-400 focus:outline-none resize-none"
-                  />
-                  <button
-                    onClick={() => handleRemoveQuestion(activeQuestion.localId)}
-                    className="absolute top-2 right-2 p-1.5 text-gray-300 hover:text-red-500 transition-colors rounded"
-                    title="Delete this question"
-                  >
-                    <Trash2 className="w-4 h-4" />
+                  <button type="button" onClick={() => execCmd('insertOrderedList')} className="px-2 py-0.5 text-xs font-bold rounded border border-gray-200 bg-white text-gray-600 hover:bg-gray-100">OL</button>
+                  <button type="button" onClick={() => execCmd('insertUnorderedList')} className="px-2 py-0.5 text-xs font-bold rounded border border-gray-200 bg-white text-gray-600 hover:bg-gray-100">UL</button>
+                  <div className="w-px h-4 bg-gray-200 mx-1"></div>
+                  <button type="button" onClick={() => { const url = prompt('Enter image URL:'); if (url) execCmd('insertImage', url); }} className="px-2 py-0.5 text-xs font-bold rounded border border-gray-200 bg-white text-gray-600 hover:bg-gray-100" title="Insert Image">
+                    <Image className="w-3.5 h-3.5 inline" />
                   </button>
                 </div>
+                <div
+                  ref={questionEditorRef}
+                  contentEditable
+                  dir="ltr"
+                  suppressContentEditableWarning
+                  style={{ direction: 'ltr' }}
+                  onInput={() => {
+                    if (questionEditorRef.current) {
+                      questionHtmlRef.current = questionEditorRef.current.innerHTML;
+                    }
+                  }}
+                  onBlur={() => {
+                    // Commit only when user leaves the editor
+                    commitQuestionHtmlToStore();
+                  }}
+                  className="w-full px-4 py-3 text-sm text-gray-800 text-left [&:empty:before]:content-[attr(data-placeholder)] [&:empty:before]:text-gray-400 min-h-[100px] focus:outline-none"
+                  data-placeholder="Type the question here..."
+                />
+              </div>
+
+              {/* Media URL */}
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider">Media URL (optional)</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={activeQuestion.media_url}
+                    onChange={(e) => handleFieldChange('media_url', e.target.value)}
+                    placeholder="Paste an image URL here..."
+                    className="flex-1 px-3 py-2 text-sm text-gray-800 placeholder-gray-400 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#5B7FEC]"
+                  />
+
+                  {activeQuestion.media_url && (
+                    <div className="relative group shrink-0">
+                      <img
+                        src={activeQuestion.media_url}
+                        alt="Preview"
+                        className="w-10 h-10 rounded-lg border border-gray-200 object-cover"
+                        onError={() => setMediaPreviewError(true)}
+                      />
+                      {mediaPreviewError ? (
+                        <div className="mt-1 text-[11px] font-semibold text-red-600">Invalid image URL</div>
+                      ) : (
+                        <div className="mt-1 h-[14px]" />
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Dedicated preview block with invalid fallback */}
+                {activeQuestion.media_url ? (
+                  <div className="mt-2 rounded-lg border border-gray-200 bg-white p-3">
+                    <div className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2">Preview</div>
+                    <div className="flex items-start gap-3">
+                      <div className="shrink-0 w-20 h-20 rounded-lg overflow-hidden border border-gray-200 bg-gray-50 flex items-center justify-center">
+                        {mediaPreviewError ? (
+                          <div className="px-2 py-1 text-center text-xs font-bold text-red-600">Invalid image URL</div>
+                        ) : (
+                          <img
+                            src={activeQuestion.media_url}
+                            alt="Preview"
+                            className="w-full h-full object-cover"
+                            onError={() => setMediaPreviewError(true)}
+                          />
+                        )}
+                      </div>
+                      <div className="text-xs text-gray-600">
+                        If the preview doesn’t load, check that the URL points directly to an image.
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
               </div>
 
               {/* Options Section */}
