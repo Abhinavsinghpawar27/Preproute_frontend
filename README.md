@@ -68,6 +68,21 @@ The optimised output will be in the `dist/` directory.
 
 ---
 
+
+<img width="1085" height="766" alt="Screenshot 2026-07-11 014756" src="https://github.com/user-attachments/assets/929ef6a9-37bb-4921-8af5-6170c04e217a" />
+
+<img width="1907" height="917" alt="Screenshot 2026-07-11 052441" src="https://github.com/user-attachments/assets/f28cadf6-b24a-4f17-9aa5-6d9fde67412a" />
+
+<img width="1915" height="927" alt="Screenshot 2026-07-11 063847" src="https://github.com/user-attachments/assets/1a201cc1-5043-4512-9447-08ca805b3652" />
+
+<img width="1912" height="912" alt="Screenshot 2026-07-11 063824" src="https://github.com/user-attachments/assets/265f56c6-621e-474f-8907-29c20d30de51" />
+
+<img width="1907" height="925" alt="Screenshot 2026-07-11 063814" src="https://github.com/user-attachments/assets/3e3f7baf-3cfd-48b9-9394-df83b98925df" />
+
+<img width="1918" height="931" alt="Screenshot 2026-07-11 063531" src="https://github.com/user-attachments/assets/ca4476df-0efd-4c3f-afd3-8ac9ac91da0b" />
+
+
+
 ## Folder Structure
 
 ```
