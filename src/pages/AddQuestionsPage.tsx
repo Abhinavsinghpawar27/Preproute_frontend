@@ -23,13 +23,26 @@ const EMPTY_QUESTION = (testId: string): DraftQuestion => ({
   isSaved: false,
 });
 
-const isQuestionComplete = (q: DraftQuestion): boolean =>
-  q.question.trim().length > 0 &&
-  q.option1.trim().length > 0 &&
-  q.option2.trim().length > 0 &&
-  q.option3.trim().length > 0 &&
-  q.option4.trim().length > 0 &&
-  q.correct_option !== '';
+const isQuestionComplete = (q: DraftQuestion): boolean => {
+  const result =
+    q.question.trim().length > 0 &&
+    q.option1.trim().length > 0 &&
+    q.option2.trim().length > 0 &&
+    q.option3.trim().length > 0 &&
+    q.option4.trim().length > 0 &&
+    q.correct_option !== '';
+  if (!result) {
+    console.log('[AddQuestions] isQuestionComplete false for', q.localId.substring(0, 8), {
+      questionLen: q.question.trim().length,
+      opt1Len: q.option1.trim().length,
+      opt2Len: q.option2.trim().length,
+      opt3Len: q.option3.trim().length,
+      opt4Len: q.option4.trim().length,
+      correct_option: q.correct_option,
+    });
+  }
+  return result;
+};
 
 export const AddQuestionsPage: React.FC = () => {
   const { id: testId } = useParams<{ id: string }>();
@@ -185,6 +198,8 @@ export const AddQuestionsPage: React.FC = () => {
     setIsSaving(true);
     try {
       // POST /questions/bulk
+      // Backend requires `subject` (UUID) on each question
+      const subjectId = test?.subject || '';
       const bulkPayload = {
         questions: completedQuestions.map((q) => ({
           type: q.type,
@@ -196,11 +211,16 @@ export const AddQuestionsPage: React.FC = () => {
           correct_option: q.correct_option,
           explanation: q.explanation,
           difficulty: q.difficulty,
+          subject: subjectId,
           test_id: q.test_id,
         })),
       };
 
+      console.log('[AddQuestions] Sending POST /questions/bulk payload:', JSON.stringify(bulkPayload, null, 2));
+
       const bulkResult = await questionsApi.bulkCreate(bulkPayload);
+
+      console.log('[AddQuestions] POST /questions/bulk response:', JSON.stringify(bulkResult, null, 2));
 
       if (bulkResult.status !== 'success') {
         toast.error(bulkResult.message || 'Failed to save questions.');
@@ -212,16 +232,24 @@ export const AddQuestionsPage: React.FC = () => {
 
       // PUT /tests/:id to attach question IDs
       const questionIds = bulkResult.data.map((q) => q.id!).filter(Boolean);
-      await testsApi.updateTest(testId, {
-        questions: questionIds as unknown as string[],
+      console.log('[AddQuestions] Sending PUT /tests/:id with questionIds:', questionIds);
+      const updatePayload = {
+        questions: questionIds,
         total_questions: questionIds.length,
-      } as any); // ASSUMPTION: questions field accepts string[] of IDs per API doc
+      };
+      console.log('[AddQuestions] PUT payload:', JSON.stringify(updatePayload));
+      await testsApi.updateTest(testId, updatePayload as any);
 
       toast.success(bulkResult.message || 'Questions saved successfully!');
       navigate(`/test/${testId}/preview`);
     } catch (err: any) {
-      console.error('Save questions error:', err);
-      toast.error(err?.response?.data?.message || 'Failed to save questions. Please try again.');
+      console.error('[AddQuestions] Save error:', err);
+      console.error('[AddQuestions] Error response:', JSON.stringify(err?.response?.data, null, 2));
+      const apiMessage = err?.response?.data?.message || '';
+      const details = err?.response?.data?.errors
+        ? JSON.stringify(err.response.data.errors)
+        : '';
+      toast.error(apiMessage + (details ? ': ' + details : 'Failed to save questions.'));
     } finally {
       setIsSaving(false);
     }
@@ -263,10 +291,9 @@ export const AddQuestionsPage: React.FC = () => {
             const complete = isQuestionComplete(q);
             const isActive = q.localId === activeQuestionLocalId;
             return (
-              <button
+              <div
                 key={q.localId}
-                onClick={() => setActiveQuestion(q.localId)}
-                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-semibold transition-all border ${
+                className={`flex items-center rounded-lg text-sm font-semibold border transition-all ${
                   isActive
                     ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
                     : complete
@@ -274,16 +301,31 @@ export const AddQuestionsPage: React.FC = () => {
                     : 'bg-white border-gray-150 text-gray-400 hover:bg-gray-50'
                 }`}
               >
-                <div className="flex items-center space-x-2.5">
-                  {complete ? (
-                    <CheckCircle className="w-4 h-4 text-emerald-500 shrink-0" />
-                  ) : (
-                    <Circle className="w-4 h-4 text-gray-300 shrink-0" />
-                  )}
-                  <span>Question {idx + 1}</span>
-                </div>
-                <ChevronRight className="w-3.5 h-3.5 text-gray-400" />
-              </button>
+                <button
+                  onClick={() => setActiveQuestion(q.localId)}
+                  className="flex-1 flex items-center px-3 py-2.5 min-w-0"
+                >
+                  <div className="flex items-center space-x-2.5">
+                    {complete ? (
+                      <CheckCircle className="w-4 h-4 text-emerald-500 shrink-0" />
+                    ) : (
+                      <Circle className="w-4 h-4 text-gray-300 shrink-0" />
+                    )}
+                    <span>Question {idx + 1}</span>
+                  </div>
+                  <ChevronRight className="w-3.5 h-3.5 text-gray-400 ml-auto" />
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleRemoveQuestion(q.localId);
+                  }}
+                  className="p-2.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-r-lg transition-colors shrink-0"
+                  title="Delete question"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
             );
           })}
         </div>
@@ -410,14 +452,23 @@ export const AddQuestionsPage: React.FC = () => {
 
           {activeQuestion ? (
             <div className="space-y-5">
-              {/* Delete All Edits */}
-              <button
-                onClick={handleDeleteAllEdits}
-                className="flex items-center text-xs font-bold text-red-500 hover:text-red-700 transition-colors"
-              >
-                <Trash2 className="w-3.5 h-3.5 mr-1.5" />
-                Delete All Edits
-              </button>
+              {/* Question-level action buttons */}
+              <div className="flex items-center justify-between">
+                <button
+                  onClick={handleDeleteAllEdits}
+                  className="flex items-center text-xs font-bold text-amber-600 hover:text-amber-700 transition-colors"
+                >
+                  <Trash2 className="w-3.5 h-3.5 mr-1.5" />
+                  Clear Fields
+                </button>
+                <button
+                  onClick={() => handleRemoveQuestion(activeQuestion.localId)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  Delete Question
+                </button>
+              </div>
 
               {/* Question Text Area */}
               <div className="bg-white rounded-xl border border-gray-150 shadow-sm overflow-hidden">
@@ -455,19 +506,34 @@ export const AddQuestionsPage: React.FC = () => {
                 {(['option1', 'option2', 'option3', 'option4'] as const).map((optKey, idx) => {
                   const isCorrect = activeQuestion.correct_option === optKey;
                   return (
-                    <div key={optKey} className="flex items-center gap-3">
+                    <div
+                      key={optKey}
+                      className="flex items-center gap-3 cursor-pointer group"
+                      onClick={() => {
+                        console.log('[AddQuestions] Row clicked for', optKey, 'was:', activeQuestion.correct_option);
+                        handleFieldChange('correct_option', optKey);
+                      }}
+                    >
                       <input
                         type="radio"
                         name={`correct_${activeQuestion.localId}`}
                         checked={isCorrect}
-                        onChange={() => handleFieldChange('correct_option', optKey)}
-                        className="w-4 h-4 text-[#5B7FEC] focus:ring-[#5B7FEC] shrink-0 cursor-pointer"
+                        readOnly
+                        className="w-4 h-4 text-[#5B7FEC] shrink-0 pointer-events-none"
                       />
-                      <div className={`flex-1 flex items-center bg-white rounded-lg border transition-colors ${isCorrect ? 'border-[#5B7FEC] ring-1 ring-[#5B7FEC]' : 'border-gray-200'}`}>
+                      <div className={`flex-1 flex items-center bg-white rounded-lg border transition-all ${
+                        isCorrect
+                          ? 'border-[#5B7FEC] ring-1 ring-[#5B7FEC]'
+                          : 'border-gray-200 group-hover:border-gray-300'
+                      }`}>
                         <input
                           type="text"
                           value={activeQuestion[optKey]}
-                          onChange={(e) => handleFieldChange(optKey, e.target.value)}
+                          onChange={(e) => {
+                            console.log('[AddQuestions] Text changed for', optKey, 'value:', e.target.value);
+                            handleFieldChange(optKey, e.target.value);
+                          }}
+                          onClick={(e) => e.stopPropagation()}
                           placeholder={`Type Option ${idx + 1} here`}
                           className="flex-1 px-4 py-2.5 text-sm text-gray-800 placeholder-gray-400 focus:outline-none rounded-lg bg-transparent"
                         />
