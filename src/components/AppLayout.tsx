@@ -106,7 +106,14 @@ export const AppLayout: React.FC = () => {
             >
               <path d="M2 10 Q 8 2, 15 10 T 28 5" />
             </svg>
-            <span className="text-2xl font-extrabold text-[#5B7FEC]">P</span>
+            {/* Calligraphy "P" with curved tail at bottom-left */}
+            <svg
+              className="w-7 h-7 text-[#5B7FEC]"
+              viewBox="0 0 28 32"
+              fill="currentColor"
+            >
+              <path d="M18.5 3.5C11 3.5 6 8 6 15.5v13a1.5 1.5 0 0 0 3 0v-7.5h11c6.5 0 10-3.5 10-9S24.5 3.5 18.5 3.5zM9 18.5V9.2c0-4.2 3.5-6.7 9.5-6.7S29 6 29 12s-3.5 8.5-10.5 8.5H9v-2zm12-4c0 2.5-1.5 4-4 4s-4-1.5-4-4 1.5-4 4-4 4 1.5 4 4z"/>
+            </svg>
           </div>
           <span className="text-2xl font-extrabold text-[#374151]">repRoute</span>
         </div>
@@ -126,7 +133,7 @@ export const AppLayout: React.FC = () => {
                 onClick={item.onClick}
                 className="flex items-center px-4 py-3 text-sm font-semibold rounded-lg text-gray-500 hover:bg-gray-50 hover:text-gray-900 transition-colors duration-150"
               >
-                <Icon className="w-5 h-5 mr-3 stroke-[2.25]" />
+                <Icon className="w-5 h-5 mr-4 stroke-[1.5]" />
                 {item.name}
               </a>
             );
@@ -145,7 +152,7 @@ export const AppLayout: React.FC = () => {
                 }`;
               }}
             >
-              <Icon className={`w-5 h-5 mr-3 stroke-[2.25] ${active ? 'text-[#5B7FEC]' : 'text-gray-500'}`} />
+              <Icon className={`w-5 h-5 mr-4 stroke-[1.5] ${active ? 'text-[#5B7FEC]' : 'text-gray-500'}`} />
               {item.name}
             </NavLink>
           );
